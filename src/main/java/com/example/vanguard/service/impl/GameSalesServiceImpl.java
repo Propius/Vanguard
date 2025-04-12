@@ -70,7 +70,7 @@ public class GameSalesServiceImpl implements GameSalesService {
             reader.readLine(); // Skip header
             int id = 1; // Start ID from 1
             List<String> chunk = new ArrayList<>();
-            int chunkSize = 100000; // Size of each chunk
+            int chunkSize = 50000; // Size of each chunk
 
             while ((line = reader.readLine()) != null) {
               String[] columns = line.split(",");
