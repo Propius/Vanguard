@@ -11,10 +11,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -50,10 +48,8 @@ public interface GameSalesController {
             content = @Content)
       })
   CompletableFuture<Page<GameSales>> getGameSales(
-      @RequestParam(required = false) @Schema(example = "2025-04-01T00:00:00Z")
-          ZonedDateTime fromDate,
-      @RequestParam(required = false) @Schema(example = "2025-04-30T23:59:59Z")
-          ZonedDateTime toDate,
+      @RequestParam(required = false) @Schema(example = "2025-04-01") LocalDate fromDate,
+      @RequestParam(required = false) @Schema(example = "2025-04-30") LocalDate toDate,
       @RequestParam(required = false) @Schema(example = "1000") BigDecimal salePrice,
       @RequestParam(required = false, defaultValue = "")
           @Schema(
@@ -73,7 +69,7 @@ public interface GameSalesController {
             content = @Content)
       })
   CompletableFuture<List<DailySalesSummary>> getTotalSales(
-      @RequestParam @Schema(example = "2025-04-01T00:00:00Z") ZonedDateTime fromDate,
-      @RequestParam @Schema(example = "2025-04-30T23:59:59Z") ZonedDateTime toDate,
+      @RequestParam @Schema(example = "2025-04-01") LocalDate fromDate,
+      @RequestParam @Schema(example = "2025-04-30") LocalDate toDate,
       @RequestParam(required = false) Integer gameNo);
 }

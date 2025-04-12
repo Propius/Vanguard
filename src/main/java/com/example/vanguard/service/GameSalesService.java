@@ -4,7 +4,7 @@ import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.entity.DailySalesSummary;
 import com.example.vanguard.entity.GameSales;
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.springframework.data.domain.Page;
@@ -32,8 +32,8 @@ public interface GameSalesService {
    * @return a CompletableFuture containing a page of game sales
    */
   CompletableFuture<Page<GameSales>> getGameSales(
-      ZonedDateTime fromDate,
-      ZonedDateTime toDate,
+      LocalDate fromDate,
+      LocalDate toDate,
       BigDecimal salePrice,
       FilterType filterType,
       Pageable pageable);
@@ -41,11 +41,11 @@ public interface GameSalesService {
   /**
    * Retrieves a paginated list of game sales filtered by date.
    *
-   * @param fromDate
-   * @param toDate
-   * @param gameNo
+   * @param fromDate the start date for filtering
+   * @param toDate the end date for filtering
+   * @param gameNo the game number for filtering
    * @return a CompletableFuture containing a page of game sales
    */
   CompletableFuture<List<DailySalesSummary>> getTotalSales(
-      ZonedDateTime fromDate, ZonedDateTime toDate, Integer gameNo);
+      LocalDate fromDate, LocalDate toDate, Integer gameNo);
 }

@@ -2,7 +2,7 @@ package com.example.vanguard.entity;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
 
 @Entity
 @IdClass(DailySalesSummaryId.class)
@@ -16,7 +16,7 @@ public class DailySalesSummary {
 
   @Id
   @Column(name = "date_of_sale", nullable = false)
-  private ZonedDateTime dateOfSale;
+  private LocalDate dateOfSale;
 
   @Id
   @Column(name = "game_no", nullable = false)
@@ -43,11 +43,11 @@ public class DailySalesSummary {
     return new DailySalesSummaryBuilder();
   }
 
-  public ZonedDateTime getDateOfSale() {
+  public LocalDate getDateOfSale() {
     return dateOfSale;
   }
 
-  public void setDateOfSale(ZonedDateTime dateOfSale) {
+  public void setDateOfSale(LocalDate dateOfSale) {
     this.dateOfSale = dateOfSale;
   }
 
@@ -77,14 +77,14 @@ public class DailySalesSummary {
 
   public static final class DailySalesSummaryBuilder {
 
-    private ZonedDateTime dateOfSale;
+    private LocalDate dateOfSale;
     private Integer gameNo;
     private int totalGamesSold;
     private BigDecimal totalSales;
 
     private DailySalesSummaryBuilder() {}
 
-    public DailySalesSummaryBuilder dateOfSale(ZonedDateTime dateOfSale) {
+    public DailySalesSummaryBuilder dateOfSale(LocalDate dateOfSale) {
       this.dateOfSale = dateOfSale;
       return this;
     }

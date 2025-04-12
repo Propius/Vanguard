@@ -6,7 +6,7 @@ import com.example.vanguard.entity.DailySalesSummary;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.service.GameSalesService;
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.springframework.data.domain.Page;
@@ -38,8 +38,8 @@ public class GameSalesControllerImpl implements GameSalesController {
   @GetMapping("/getGameSales")
   @ResponseStatus(HttpStatus.OK)
   public CompletableFuture<Page<GameSales>> getGameSales(
-      @RequestParam(required = false) ZonedDateTime fromDate,
-      @RequestParam(required = false) ZonedDateTime toDate,
+      @RequestParam(required = false) LocalDate fromDate,
+      @RequestParam(required = false) LocalDate toDate,
       @RequestParam(required = false) BigDecimal salePrice,
       @RequestParam(required = false, defaultValue = "") FilterType filterType,
       @PageableDefault(sort = "gameNo", direction = Sort.Direction.ASC, size = 100)
@@ -51,8 +51,8 @@ public class GameSalesControllerImpl implements GameSalesController {
   @GetMapping("/getTotalSales")
   @ResponseStatus(HttpStatus.OK)
   public CompletableFuture<List<DailySalesSummary>> getTotalSales(
-      @RequestParam(required = false) ZonedDateTime fromDate,
-      @RequestParam(required = false) ZonedDateTime toDate,
+      @RequestParam(required = false) LocalDate fromDate,
+      @RequestParam(required = false) LocalDate toDate,
       @RequestParam(required = false) Integer gameNo) {
     return gameSalesService.getTotalSales(fromDate, toDate, gameNo);
   }

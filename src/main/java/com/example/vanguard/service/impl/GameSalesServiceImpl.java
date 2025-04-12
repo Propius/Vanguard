@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -112,8 +113,8 @@ public class GameSalesServiceImpl implements GameSalesService {
    */
   @Override
   public CompletableFuture<Page<GameSales>> getGameSales(
-      ZonedDateTime fromDate,
-      ZonedDateTime toDate,
+      LocalDate fromDate,
+      LocalDate toDate,
       BigDecimal salePrice,
       FilterType filterType,
       Pageable pageable) {
@@ -141,15 +142,15 @@ public class GameSalesServiceImpl implements GameSalesService {
   /**
    * Retrieves a paginated list of game sales filtered by date.
    *
-   * @param fromDate
-   * @param toDate
-   * @param gameNo
+   * @param fromDate the start date for filtering
+   * @param toDate the end date for filtering
+   * @param gameNo the game number for filtering
    * @return a CompletableFuture containing a page of game sales
    */
   @Override
   @Cacheable(value = "totalSales", key = "#fromDate + '-' + #toDate + '-' + #gameNo")
   public CompletableFuture<List<DailySalesSummary>> getTotalSales(
-      ZonedDateTime fromDate, ZonedDateTime toDate, Integer gameNo) {
+      LocalDate fromDate, LocalDate toDate, Integer gameNo) {
     return CompletableFuture.supplyAsync(
         () -> dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo));
   }
