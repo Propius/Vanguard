@@ -35,3 +35,7 @@
 ### Accessing the Application
 
 http://localhost:8080/swagger-ui/index.html#/
+
+### Accessing RabbitMQ Management Console
+
+http://localhost:15672/

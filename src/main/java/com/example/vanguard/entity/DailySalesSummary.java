@@ -1,6 +1,7 @@
 package com.example.vanguard.entity;
 
 import jakarta.persistence.*;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.hibernate.annotations.Immutable;
@@ -10,7 +11,7 @@ import org.hibernate.annotations.Subselect;
 @Immutable
 @Subselect("SELECT * FROM daily_sales_summary_view")
 @IdClass(DailySalesSummaryId.class)
-public class DailySalesSummary {
+public class DailySalesSummary implements Serializable {
 
   @Id
   @Column(name = "date_of_sale", nullable = false)

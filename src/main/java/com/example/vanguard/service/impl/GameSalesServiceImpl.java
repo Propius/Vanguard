@@ -1,25 +1,28 @@
 package com.example.vanguard.service.impl;
 
+import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.entity.DailySalesSummary;
 import com.example.vanguard.entity.GameSales;
+import com.example.vanguard.exception.CsvProcessingException;
 import com.example.vanguard.repository.DailySalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.repository.GameSalesSpecification;
 import com.example.vanguard.service.GameSalesService;
+import com.example.vanguard.util.ValidationUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.springframework.cache.annotation.Cacheable;
+import java.util.*;
+import java.util.concurrent.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.cache.Cache;
+import org.springframework.cache.jcache.JCacheCacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -29,14 +32,22 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class GameSalesServiceImpl implements GameSalesService {
 
+  private static final Logger log = LoggerFactory.getLogger(GameSalesServiceImpl.class);
+
   private final GameSalesRepository gameSalesRepository;
   private final DailySalesSummaryRepository dailySalesSummaryRepository;
+  private final RabbitTemplate rabbitTemplate;
+  private final JCacheCacheManager cacheManager;
 
   public GameSalesServiceImpl(
       GameSalesRepository gameSalesRepository,
-      DailySalesSummaryRepository dailySalesSummaryRepository) {
+      DailySalesSummaryRepository dailySalesSummaryRepository,
+      RabbitTemplate rabbitTemplate,
+      JCacheCacheManager cacheManager) {
     this.gameSalesRepository = gameSalesRepository;
     this.dailySalesSummaryRepository = dailySalesSummaryRepository;
+    this.rabbitTemplate = rabbitTemplate;
+    this.cacheManager = cacheManager;
   }
 
   /**
@@ -49,44 +60,63 @@ public class GameSalesServiceImpl implements GameSalesService {
   public CompletableFuture<Void> importCsv(MultipartFile file) {
     return CompletableFuture.runAsync(
         () -> {
-
-          // Measure start time
           long startTime = System.currentTimeMillis();
-
           try (BufferedReader reader =
               new BufferedReader(new InputStreamReader(file.getInputStream()))) {
-            ExecutorService executor =
-                Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-            List<CompletableFuture<Void>> futures = new ArrayList<>();
-            List<String> batch = new ArrayList<>();
-            int chunkSize = 50000;
-
             String line;
             reader.readLine(); // Skip header
+            int id = 1; // Start ID from 1
+            List<String> chunk = new ArrayList<>();
+
             while ((line = reader.readLine()) != null) {
-              batch.add(line);
-              if (batch.size() == chunkSize) {
-                List<String> chunk = new ArrayList<>(batch);
-                futures.add(CompletableFuture.runAsync(() -> processChunk(chunk), executor));
-                batch.clear();
+              String[] columns = line.split(",");
+              if (columns.length != 9) {
+                throw new IllegalArgumentException(
+                    "Invalid CSV format: Each row must have 9 columns");
               }
-            }
-            if (!batch.isEmpty()) {
-              List<String> chunk = new ArrayList<>(batch);
-              futures.add(CompletableFuture.runAsync(() -> processChunk(chunk), executor));
+
+              // Validate and process each column
+              Integer gameNo =
+                  ValidationUtils.validateRange(Integer.parseInt(columns[1]), 1, 100, "Game No");
+              String gameName = ValidationUtils.validateStringField(columns[2], "Game Name", 20);
+              String gameCode = ValidationUtils.validateStringField(columns[3], "Game Code", 5);
+              Integer type = ValidationUtils.validateType(columns[4]);
+              BigDecimal costPrice =
+                  ValidationUtils.validateBigDecimal(
+                      columns[5], "Cost Price", new BigDecimal("100"));
+              BigDecimal tax =
+                  ValidationUtils.validateBigDecimal(columns[6], "Tax", new BigDecimal("100"));
+              BigDecimal salePrice =
+                  ValidationUtils.validateBigDecimal(columns[7], "Tax", new BigDecimal("100"));
+              ZonedDateTime dateOfSale = ValidationUtils.validateDate(columns[8]);
+
+              // Construct the CSV line with ID
+              String processedLine =
+                  String.join(
+                      ",",
+                      String.valueOf(id++),
+                      String.valueOf(gameNo),
+                      gameName,
+                      gameCode,
+                      String.valueOf(type),
+                      costPrice.toString(),
+                      tax.toString(),
+                      salePrice.toString(),
+                      dateOfSale.toString());
+
+              chunk.add(processedLine);
             }
 
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-            executor.shutdown();
+            // Send any remaining lines in the last chunk
+            if (!chunk.isEmpty()) {
+              executeRabbitMq(chunk);
+            }
           } catch (IOException e) {
-            throw new RuntimeException("Failed to process CSV file: " + e.getMessage(), e);
+            throw new CsvProcessingException("Failed to process CSV file: " + e.getMessage(), e);
           }
-
-          // Measure end time
           long endTime = System.currentTimeMillis();
-
           // Print the time taken
-          System.out.println("Time taken to import CSV: " + (endTime - startTime) + " ms");
+          log.info("Time taken to import CSV: {} ms", (endTime - startTime));
         });
   }
 
@@ -111,30 +141,51 @@ public class GameSalesServiceImpl implements GameSalesService {
     // Measure start time
     long startTime = System.currentTimeMillis();
 
-    if (pageable.getPageSize() > 100) {
-      throw new IllegalArgumentException("Page size must not exceed 100 records per request");
-    }
-
-    if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
-      throw new IllegalArgumentException("fromDate must not be after toDate");
-    }
-
-    if (salePrice != null && salePrice.compareTo(BigDecimal.ZERO) < 0) {
-      throw new IllegalArgumentException("salePrice must not be negative");
-    }
+    ValidationUtils.validatePageSize(pageable.getPageSize());
+    ValidationUtils.validateDateRange(fromDate, toDate);
+    ValidationUtils.validateSalePrice(salePrice);
 
     return CompletableFuture.supplyAsync(
         () -> {
+          Cache cache = cacheManager.getCache("gameSales");
+          String cacheKey =
+              fromDate
+                  + "-"
+                  + toDate
+                  + "-"
+                  + salePrice
+                  + "-"
+                  + filterType
+                  + "-"
+                  + pageable.getPageNumber();
+
+          // Try to retrieve the cached value
+          Page<GameSales> cachedResult = cache != null ? cache.get(cacheKey, Page.class) : null;
+          if (cachedResult != null) {
+            // Measure end time
+            long endTime = System.currentTimeMillis();
+
+            // Print the time taken
+            log.info("Time taken to get game sales: {} ms", (endTime - startTime));
+
+            return cachedResult;
+          }
+
           Specification<GameSales> specification =
               GameSalesSpecification.buildSpecification(fromDate, toDate, salePrice, filterType);
 
           Page<GameSales> gameSalesPage = gameSalesRepository.findAll(specification, pageable);
 
+          // Store the result in the cache
+          if (cache != null) {
+            cache.put(cacheKey, gameSalesPage);
+          }
+
           // Measure end time
           long endTime = System.currentTimeMillis();
 
           // Print the time taken
-          System.out.println("Time taken to import CSV: " + (endTime - startTime) + " ms");
+          log.info("Time taken to get game sales: {} ms", (endTime - startTime));
           return gameSalesPage;
         });
   }
@@ -148,7 +199,6 @@ public class GameSalesServiceImpl implements GameSalesService {
    * @return a CompletableFuture containing a page of game sales
    */
   @Override
-  @Cacheable(value = "totalSales", key = "#fromDate + '-' + #toDate + '-' + #gameNo")
   public CompletableFuture<List<DailySalesSummary>> getTotalSales(
       LocalDate fromDate, LocalDate toDate, Integer gameNo) {
     return CompletableFuture.supplyAsync(
@@ -156,49 +206,53 @@ public class GameSalesServiceImpl implements GameSalesService {
           // Measure start time
           long startTime = System.currentTimeMillis();
 
+          Cache cache = cacheManager.getCache("totalSales");
+          String cacheKey = fromDate + "-" + toDate + "-" + gameNo;
+
+          // Try to retrieve the cached value
+          List<DailySalesSummary> cachedResult =
+              cache != null ? cache.get(cacheKey, List.class) : null;
+          if (cachedResult != null) {
+            // Measure end time
+            long endTime = System.currentTimeMillis();
+
+            // Print the time taken
+            log.info("Time taken to get total sales: {} ms", (endTime - startTime));
+
+            return cachedResult;
+          }
+
           List<DailySalesSummary> dailySalesSummaries =
               dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo);
+
+          // Store the result in the cache
+          if (cache != null) {
+            cache.put(cacheKey, dailySalesSummaries);
+          }
 
           // Measure end time
           long endTime = System.currentTimeMillis();
 
           // Print the time taken
-          System.out.println("Time taken to import CSV: " + (endTime - startTime) + " ms");
+          log.info("Time taken to get total sales: {} ms", (endTime - startTime));
 
           return dailySalesSummaries;
         });
   }
 
-  private void processChunk(List<String> chunk) {
-    List<GameSales> batch = new ArrayList<>();
-    for (String line : chunk) {
-      String[] columns = line.split(",");
-      if (columns.length != 9) {
-        throw new IllegalArgumentException("Invalid CSV format: Each row must have 9 columns");
-      }
-      try {
-        Integer gameNo = Integer.parseInt(columns[1]);
-        ZonedDateTime dateOfSale = ZonedDateTime.parse(columns[8]);
-
-        // Check if the record already exists
-        GameSales existingGameSales =
-            gameSalesRepository.findByGameNoAndDateOfSale(gameNo, dateOfSale);
-
-        GameSales gameSales = (existingGameSales != null) ? existingGameSales : new GameSales();
-        gameSales.setGameNo(gameNo);
-        gameSales.setGameName(columns[2]);
-        gameSales.setGameCode(columns[3]);
-        gameSales.setType(Integer.parseInt(columns[4]));
-        gameSales.setCostPrice(new BigDecimal(columns[5]));
-        gameSales.setTax(new BigDecimal(columns[6]));
-        gameSales.setSalePrice(new BigDecimal(columns[7]));
-        gameSales.setDateOfSale(dateOfSale);
-
-        batch.add(gameSales);
-      } catch (NumberFormatException | DateTimeParseException e) {
-        throw new IllegalArgumentException("Invalid data format in CSV: " + e.getMessage(), e);
-      }
+  /**
+   * Sends a chunk of data to RabbitMQ.
+   *
+   * @param chunk the chunk of data to send
+   */
+  private void executeRabbitMq(List<String> chunk) {
+    try {
+      rabbitTemplate.convertAndSend(
+          RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.QUEUE_NAME, String.join("\n", chunk));
+      chunk.clear();
+    } catch (Exception e) {
+      log.error("Failed to send chunk: {}", e.getMessage());
+      // Handle the failure (e.g., retry or log the issue)
     }
-    gameSalesRepository.saveAll(batch);
   }
 }

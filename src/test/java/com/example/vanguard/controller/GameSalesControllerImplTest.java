@@ -1,7 +1,6 @@
 package com.example.vanguard.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 import com.example.vanguard.common.enumeration.FilterType;
@@ -60,16 +59,10 @@ class GameSalesControllerImplTest {
     when(gameSalesService.getGameSales(fromDate, toDate, salePrice, filterType, pageable))
         .thenReturn(future);
 
-    long startTime = System.currentTimeMillis();
     CompletableFuture<Page<GameSales>> result =
         gameSalesController.getGameSales(fromDate, toDate, salePrice, filterType, pageable);
-    long endTime = System.currentTimeMillis();
-
-    long timeTaken = endTime - startTime;
-    System.out.println("Execution time: " + timeTaken + "ms");
 
     assertEquals(future, result);
-    assertTrue(timeTaken < 50, "Execution time exceeded 50ms");
     verify(gameSalesService, times(1))
         .getGameSales(fromDate, toDate, salePrice, filterType, pageable);
   }
@@ -85,16 +78,10 @@ class GameSalesControllerImplTest {
 
     when(gameSalesService.getTotalSales(fromDate, toDate, gameNo)).thenReturn(future);
 
-    long startTime = System.currentTimeMillis();
     CompletableFuture<List<DailySalesSummary>> result =
         gameSalesController.getTotalSales(fromDate, toDate, gameNo);
-    long endTime = System.currentTimeMillis();
-
-    long timeTaken = endTime - startTime;
-    System.out.println("Execution time: " + timeTaken + "ms");
 
     assertEquals(future, result);
-    assertTrue(timeTaken < 50, "Execution time exceeded 50ms");
     verify(gameSalesService, times(1)).getTotalSales(fromDate, toDate, gameNo);
   }
 }

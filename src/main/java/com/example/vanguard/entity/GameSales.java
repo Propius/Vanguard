@@ -1,6 +1,7 @@
 package com.example.vanguard.entity;
 
 import jakarta.persistence.*;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
@@ -10,9 +11,10 @@ import java.time.ZonedDateTime;
     indexes = {
       @Index(name = "idx_date_of_sale", columnList = "date_of_sale"),
       @Index(name = "idx_game_no", columnList = "game_no"),
-      @Index(name = "idx_sale_price", columnList = "sale_price")
+      @Index(name = "idx_sale_price", columnList = "sale_price"),
+      @Index(name = "idx_game_no_date_of_sale", columnList = "game_no, date_of_sale")
     })
-public class GameSales {
+public class GameSales implements Serializable {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

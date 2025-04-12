@@ -1,0 +1,20 @@
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.ehcache.org/v3"
+        xsi:schemaLocation="http://www.ehcache.org/v3 http://www.ehcache.org/schema/ehcache-core.xsd">
+    <cache alias="totalSales">
+        <expiry>
+            <ttl unit="seconds">600</ttl> <!-- Cache expires after 10 minutes -->
+        </expiry>
+        <resources>
+            <offheap unit="MB">100</offheap>
+        </resources>
+    </cache>
+    <cache alias="gameSales">
+        <expiry>
+            <ttl unit="seconds">600</ttl> <!-- Cache expires after 10 minutes -->
+        </expiry>
+        <resources>
+            <offheap unit="MB">100</offheap>
+        </resources>
+    </cache>
+</config>

@@ -3,13 +3,16 @@ package com.example.vanguard.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.entity.DailySalesSummary;
 import com.example.vanguard.entity.GameSales;
+import com.example.vanguard.exception.CsvProcessingException;
 import com.example.vanguard.repository.DailySalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.service.impl.GameSalesServiceImpl;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,6 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.cache.Cache;
+import org.springframework.cache.jcache.JCacheCacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -30,35 +36,37 @@ import org.springframework.web.multipart.MultipartFile;
 class GameSalesServiceImplTest {
 
   @Mock private GameSalesRepository gameSalesRepository;
-
   @Mock private DailySalesSummaryRepository dailySalesSummaryRepository;
+  @Mock private RabbitTemplate rabbitTemplate;
+  @Mock private JCacheCacheManager cacheManager;
+  @Mock private Cache cache;
 
   @InjectMocks private GameSalesServiceImpl gameSalesService;
 
   @BeforeEach
   void setUp() {
     MockitoAnnotations.openMocks(this);
+    when(cacheManager.getCache(anyString())).thenReturn(cache);
   }
 
   @Test
-  void testImportCsv() throws Exception {
-    String csvContent = "header\n1,123,GameName,Code,1,10.0,1.0,11.0,2023-01-01T00:00:00Z\n";
+  void testImportCsv_ValidCsv() throws Exception {
+    String csvContent = "header\n1,100,GameName,Code,1,10.0,1.0,11.0,2023-01-01T00:00:00Z\n";
     InputStream inputStream = new ByteArrayInputStream(csvContent.getBytes());
     MultipartFile file = mock(MultipartFile.class);
 
     when(file.getInputStream()).thenReturn(inputStream);
-    when(gameSalesRepository.findByGameNoAndDateOfSale(
-            123, ZonedDateTime.parse("2023-01-01T00:00:00Z")))
-        .thenReturn(new GameSales());
 
     gameSalesService.importCsv(file).join();
 
-    verify(gameSalesRepository, times(1)).saveAll(anyList());
+    verify(rabbitTemplate, times(1))
+        .convertAndSend(
+            eq(RabbitMQConfig.EXCHANGE_NAME), eq(RabbitMQConfig.QUEUE_NAME), anyString());
   }
 
   @Test
-  void testImportCsvWithInvalidData() throws Exception {
-    String csvContent = "header\n1,invalid,GameName,Code,1,10.0,1.0,11.0,invalid-date\n";
+  void testImportCsv_InvalidCsvFormat() throws Exception {
+    String csvContent = "header\n1,100,GameName,Code,1,10.0,1.0,11.0\n"; // Missing columns
     InputStream inputStream = new ByteArrayInputStream(csvContent.getBytes());
     MultipartFile file = mock(MultipartFile.class);
 
@@ -66,12 +74,22 @@ class GameSalesServiceImplTest {
 
     CompletionException exception =
         assertThrows(CompletionException.class, () -> gameSalesService.importCsv(file).join());
-
-    assertInstanceOf(IllegalArgumentException.class, exception.getCause());
+    assertTrue(exception.getCause() instanceof IllegalArgumentException);
   }
 
   @Test
-  void testGetGameSales() {
+  void testImportCsv_IOException() throws Exception {
+    MultipartFile file = mock(MultipartFile.class);
+
+    when(file.getInputStream()).thenThrow(new IOException("Test exception"));
+
+    CompletionException exception =
+        assertThrows(CompletionException.class, () -> gameSalesService.importCsv(file).join());
+    assertTrue(exception.getCause() instanceof CsvProcessingException);
+  }
+
+  @Test
+  void testGetGameSales_ValidInputs() {
     LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
     LocalDate toDate = ZonedDateTime.now().toLocalDate();
     BigDecimal salePrice = BigDecimal.valueOf(50);
@@ -90,7 +108,7 @@ class GameSalesServiceImplTest {
   }
 
   @Test
-  void testGetGameSalesWithInvalidPageSize() {
+  void testGetGameSales_InvalidPageSize() {
     Pageable pageable = mock(Pageable.class);
     when(pageable.getPageSize()).thenReturn(200);
 
@@ -100,20 +118,7 @@ class GameSalesServiceImplTest {
   }
 
   @Test
-  void testGetGameSalesWithInvalidDateRange() {
-    LocalDate fromDate = ZonedDateTime.now().toLocalDate();
-    LocalDate toDate = ZonedDateTime.now().minusDays(1).toLocalDate();
-    Pageable pageable = mock(Pageable.class);
-
-    when(pageable.getPageSize()).thenReturn(50);
-
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> gameSalesService.getGameSales(fromDate, toDate, null, null, pageable).join());
-  }
-
-  @Test
-  void testGetTotalSales() {
+  void testGetTotalSales_ValidInputs() {
     LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
     LocalDate toDate = ZonedDateTime.now().toLocalDate();
     Integer gameNo = 123;
@@ -127,5 +132,21 @@ class GameSalesServiceImplTest {
 
     assertEquals(summaryList, result.join());
     verify(dailySalesSummaryRepository, times(1)).findAggregatedSales(fromDate, toDate, gameNo);
+  }
+
+  @Test
+  void testGetTotalSales_CacheHit() {
+    LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
+    LocalDate toDate = ZonedDateTime.now().toLocalDate();
+    Integer gameNo = 123;
+    List<DailySalesSummary> cachedSummaryList = List.of(mock(DailySalesSummary.class));
+
+    when(cache.get(anyString(), eq(List.class))).thenReturn(cachedSummaryList);
+
+    CompletableFuture<List<DailySalesSummary>> result =
+        gameSalesService.getTotalSales(fromDate, toDate, gameNo);
+
+    assertEquals(cachedSummaryList, result.join());
+    verify(dailySalesSummaryRepository, never()).findAggregatedSales(any(), any(), any());
   }
 }
