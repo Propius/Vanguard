@@ -26,6 +26,9 @@ import org.springframework.cache.jcache.JCacheCacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -67,6 +70,7 @@ public class GameSalesServiceImpl implements GameSalesService {
             reader.readLine(); // Skip header
             int id = 1; // Start ID from 1
             List<String> chunk = new ArrayList<>();
+            int chunkSize = 100000; // Size of each chunk
 
             while ((line = reader.readLine()) != null) {
               String[] columns = line.split(",");
@@ -105,6 +109,11 @@ public class GameSalesServiceImpl implements GameSalesService {
                       dateOfSale.toString());
 
               chunk.add(processedLine);
+
+              // If chunk size is reached, send to RabbitMQ
+              if (chunk.size() == chunkSize) {
+                executeRabbitMq(chunk);
+              }
             }
 
             // Send any remaining lines in the last chunk
@@ -246,13 +255,29 @@ public class GameSalesServiceImpl implements GameSalesService {
    * @param chunk the chunk of data to send
    */
   private void executeRabbitMq(List<String> chunk) {
+    RetryTemplate retryTemplate = new RetryTemplate();
+
+    // Configure retry policy
+    SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy();
+    retryPolicy.setMaxAttempts(3); // Retry up to 3 times
+    retryTemplate.setRetryPolicy(retryPolicy);
+
+    // Configure backoff policy
+    FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
+    backOffPolicy.setBackOffPeriod(2000); // Wait 2 seconds between retries
+    retryTemplate.setBackOffPolicy(backOffPolicy);
+
     try {
-      rabbitTemplate.convertAndSend(
-          RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.QUEUE_NAME, String.join("\n", chunk));
-      chunk.clear();
+      retryTemplate.execute(
+          context -> {
+            rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.QUEUE_NAME, String.join("\n", chunk));
+            chunk.clear();
+            return null;
+          });
     } catch (Exception e) {
-      log.error("Failed to send chunk: {}", e.getMessage());
-      // Handle the failure (e.g., retry or log the issue)
+      log.error("Failed to send chunk after retries: {}", e.getMessage());
+      // Handle the failure (e.g., log or alert)
     }
   }
 }

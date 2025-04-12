@@ -24,6 +24,7 @@
   ```bash
   mvn spring-boot:run
   ```
+- Remember to run the sql script `daily_sales_summary_view.sql` in your database to create the necessary views.
 
 ### Running Test
 
@@ -43,10 +44,10 @@ http://localhost:15672/
 ### Screenshots
 
 - /import
-![img.png](img.png)
+  ![img.png](img.png)
 
 - /getTotalSales
-![img_1.png](img_1.png)
+  ![img_1.png](img_1.png)
 
 - /getGameSales
-![img_2.png](img_2.png)
+  ![img_2.png](img_2.png)

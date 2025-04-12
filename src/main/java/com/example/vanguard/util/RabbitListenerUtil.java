@@ -51,7 +51,7 @@ public class RabbitListenerUtil {
     List<String> messages = Arrays.asList(message.split("\n")); // Example of chunking
 
     try (ExecutorService executorService = createThreadPoolExecutor()) {
-      int chunkSize = 50000;
+      int chunkSize = 10000;
       for (int i = 0; i < messages.size(); i += chunkSize) {
         List<String> chunk = messages.subList(i, Math.min(i + chunkSize, messages.size()));
         executorService.submit(() -> processChunk(new ArrayList<>(chunk)));
@@ -75,7 +75,7 @@ public class RabbitListenerUtil {
     int corePoolSize = Runtime.getRuntime().availableProcessors();
     int maxPoolSize = corePoolSize * 2;
     int keepAliveTime = 60; // seconds
-    int queueCapacity = 1000;
+    int queueCapacity = 100;
 
     return new ThreadPoolExecutor(
         corePoolSize,
