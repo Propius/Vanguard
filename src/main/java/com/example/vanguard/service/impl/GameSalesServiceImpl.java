@@ -17,6 +17,8 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -47,57 +49,37 @@ public class GameSalesServiceImpl implements GameSalesService {
   public CompletableFuture<Void> importCsv(MultipartFile file) {
     return CompletableFuture.runAsync(
         () -> {
+          long startTime = System.currentTimeMillis();
           try (BufferedReader reader =
               new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            ExecutorService executor =
+                Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            List<String> batch = new ArrayList<>();
+            int chunkSize = 10000;
+
             String line;
             reader.readLine(); // Skip header
-            List<GameSales> batch = new ArrayList<>();
-            int batchSize = 100; // Define batch size
-
             while ((line = reader.readLine()) != null) {
-              String[] columns = line.split(",");
-              if (columns.length != 9) {
-                throw new IllegalArgumentException(
-                    "Invalid CSV format: Each row must have 9 columns");
-              }
-
-              try {
-                GameSales gameSales =
-                    GameSales.builder()
-                        .gameNo(Integer.parseInt(columns[1]))
-                        .gameName(columns[2])
-                        .gameCode(columns[3])
-                        .type(Integer.parseInt(columns[4]))
-                        .costPrice(new BigDecimal(columns[5]))
-                        .tax(new BigDecimal(columns[6]))
-                        .salePrice(new BigDecimal(columns[7]))
-                        .dateOfSale(ZonedDateTime.parse(columns[8]))
-                        .build();
-
-                // Check for duplicates
-                boolean exists =
-                    gameSalesRepository.existsByGameNoAndDateOfSale(
-                        gameSales.getGameNo(), gameSales.getDateOfSale());
-                if (!exists) {
-                  batch.add(gameSales);
-                }
-
-                if (batch.size() == batchSize) {
-                  gameSalesRepository.saveAll(batch);
-                  batch.clear();
-                }
-              } catch (NumberFormatException | DateTimeParseException e) {
-                throw new IllegalArgumentException(
-                    "Invalid data format in CSV: " + e.getMessage(), e);
+              batch.add(line);
+              if (batch.size() == chunkSize) {
+                List<String> chunk = new ArrayList<>(batch);
+                futures.add(CompletableFuture.runAsync(() -> processChunk(chunk), executor));
+                batch.clear();
               }
             }
-
             if (!batch.isEmpty()) {
-              gameSalesRepository.saveAll(batch); // Save remaining records
+              List<String> chunk = new ArrayList<>(batch);
+              futures.add(CompletableFuture.runAsync(() -> processChunk(chunk), executor));
             }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            executor.shutdown();
           } catch (IOException e) {
             throw new RuntimeException("Failed to process CSV file: " + e.getMessage(), e);
           }
+          long endTime = System.currentTimeMillis();
+          System.out.println("CSV import completed in " + (endTime - startTime) + "ms");
         });
   }
 
@@ -153,5 +135,32 @@ public class GameSalesServiceImpl implements GameSalesService {
       LocalDate fromDate, LocalDate toDate, Integer gameNo) {
     return CompletableFuture.supplyAsync(
         () -> dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo));
+  }
+
+  private void processChunk(List<String> chunk) {
+    List<GameSales> batch = new ArrayList<>();
+    for (String line : chunk) {
+      String[] columns = line.split(",");
+      if (columns.length != 9) {
+        throw new IllegalArgumentException("Invalid CSV format: Each row must have 9 columns");
+      }
+      try {
+        GameSales gameSales =
+            GameSales.builder()
+                .gameNo(Integer.parseInt(columns[1]))
+                .gameName(columns[2])
+                .gameCode(columns[3])
+                .type(Integer.parseInt(columns[4]))
+                .costPrice(new BigDecimal(columns[5]))
+                .tax(new BigDecimal(columns[6]))
+                .salePrice(new BigDecimal(columns[7]))
+                .dateOfSale(ZonedDateTime.parse(columns[8]))
+                .build();
+        batch.add(gameSales);
+      } catch (NumberFormatException | DateTimeParseException e) {
+        throw new IllegalArgumentException("Invalid data format in CSV: " + e.getMessage(), e);
+      }
+    }
+    gameSalesRepository.saveAll(batch);
   }
 }

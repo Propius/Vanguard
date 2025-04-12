@@ -1,35 +1,22 @@
 package com.example.vanguard.entity;
 
 import java.io.Serializable;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
 import java.util.Objects;
 
 public class DailySalesSummaryId implements Serializable {
 
-  private ZonedDateTime dateOfSale;
+  private LocalDate dateOfSale;
   private Integer gameNo;
 
   public DailySalesSummaryId() {}
 
-  public DailySalesSummaryId(ZonedDateTime dateOfSale, Integer gameNo) {
-    this.dateOfSale = dateOfSale;
-    this.gameNo = gameNo;
-  }
-
-  public ZonedDateTime getDateOfSale() {
+  public LocalDate getDateOfSale() {
     return dateOfSale;
-  }
-
-  public void setDateOfSale(ZonedDateTime dateOfSale) {
-    this.dateOfSale = dateOfSale;
   }
 
   public Integer getGameNo() {
     return gameNo;
-  }
-
-  public void setGameNo(Integer gameNo) {
-    this.gameNo = gameNo;
   }
 
   @Override
