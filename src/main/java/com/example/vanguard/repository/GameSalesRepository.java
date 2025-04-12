@@ -9,5 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface GameSalesRepository
     extends JpaRepository<GameSales, Long>, JpaSpecificationExecutor<GameSales> {
-  boolean existsByGameNoAndDateOfSale(Integer gameNo, ZonedDateTime dateOfSale);
+  GameSales findByGameNoAndDateOfSale(Integer gameNo, ZonedDateTime dateOfSale);
 }

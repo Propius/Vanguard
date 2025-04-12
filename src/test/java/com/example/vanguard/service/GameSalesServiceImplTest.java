@@ -47,9 +47,9 @@ class GameSalesServiceImplTest {
     MultipartFile file = mock(MultipartFile.class);
 
     when(file.getInputStream()).thenReturn(inputStream);
-    when(gameSalesRepository.existsByGameNoAndDateOfSale(
+    when(gameSalesRepository.findByGameNoAndDateOfSale(
             123, ZonedDateTime.parse("2023-01-01T00:00:00Z")))
-        .thenReturn(false);
+        .thenReturn(new GameSales());
 
     gameSalesService.importCsv(file).join();
 

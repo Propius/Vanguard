@@ -49,14 +49,17 @@ public class GameSalesServiceImpl implements GameSalesService {
   public CompletableFuture<Void> importCsv(MultipartFile file) {
     return CompletableFuture.runAsync(
         () -> {
+
+          // Measure start time
           long startTime = System.currentTimeMillis();
+
           try (BufferedReader reader =
               new BufferedReader(new InputStreamReader(file.getInputStream()))) {
             ExecutorService executor =
                 Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
             List<CompletableFuture<Void>> futures = new ArrayList<>();
             List<String> batch = new ArrayList<>();
-            int chunkSize = 10000;
+            int chunkSize = 50000;
 
             String line;
             reader.readLine(); // Skip header
@@ -78,8 +81,12 @@ public class GameSalesServiceImpl implements GameSalesService {
           } catch (IOException e) {
             throw new RuntimeException("Failed to process CSV file: " + e.getMessage(), e);
           }
+
+          // Measure end time
           long endTime = System.currentTimeMillis();
-          System.out.println("CSV import completed in " + (endTime - startTime) + "ms");
+
+          // Print the time taken
+          System.out.println("Time taken to import CSV: " + (endTime - startTime) + " ms");
         });
   }
 
@@ -101,6 +108,9 @@ public class GameSalesServiceImpl implements GameSalesService {
       FilterType filterType,
       Pageable pageable) {
 
+    // Measure start time
+    long startTime = System.currentTimeMillis();
+
     if (pageable.getPageSize() > 100) {
       throw new IllegalArgumentException("Page size must not exceed 100 records per request");
     }
@@ -117,7 +127,15 @@ public class GameSalesServiceImpl implements GameSalesService {
         () -> {
           Specification<GameSales> specification =
               GameSalesSpecification.buildSpecification(fromDate, toDate, salePrice, filterType);
-          return gameSalesRepository.findAll(specification, pageable);
+
+          Page<GameSales> gameSalesPage = gameSalesRepository.findAll(specification, pageable);
+
+          // Measure end time
+          long endTime = System.currentTimeMillis();
+
+          // Print the time taken
+          System.out.println("Time taken to import CSV: " + (endTime - startTime) + " ms");
+          return gameSalesPage;
         });
   }
 
@@ -134,7 +152,21 @@ public class GameSalesServiceImpl implements GameSalesService {
   public CompletableFuture<List<DailySalesSummary>> getTotalSales(
       LocalDate fromDate, LocalDate toDate, Integer gameNo) {
     return CompletableFuture.supplyAsync(
-        () -> dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo));
+        () -> {
+          // Measure start time
+          long startTime = System.currentTimeMillis();
+
+          List<DailySalesSummary> dailySalesSummaries =
+              dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo);
+
+          // Measure end time
+          long endTime = System.currentTimeMillis();
+
+          // Print the time taken
+          System.out.println("Time taken to import CSV: " + (endTime - startTime) + " ms");
+
+          return dailySalesSummaries;
+        });
   }
 
   private void processChunk(List<String> chunk) {
@@ -145,17 +177,23 @@ public class GameSalesServiceImpl implements GameSalesService {
         throw new IllegalArgumentException("Invalid CSV format: Each row must have 9 columns");
       }
       try {
-        GameSales gameSales =
-            GameSales.builder()
-                .gameNo(Integer.parseInt(columns[1]))
-                .gameName(columns[2])
-                .gameCode(columns[3])
-                .type(Integer.parseInt(columns[4]))
-                .costPrice(new BigDecimal(columns[5]))
-                .tax(new BigDecimal(columns[6]))
-                .salePrice(new BigDecimal(columns[7]))
-                .dateOfSale(ZonedDateTime.parse(columns[8]))
-                .build();
+        Integer gameNo = Integer.parseInt(columns[1]);
+        ZonedDateTime dateOfSale = ZonedDateTime.parse(columns[8]);
+
+        // Check if the record already exists
+        GameSales existingGameSales =
+            gameSalesRepository.findByGameNoAndDateOfSale(gameNo, dateOfSale);
+
+        GameSales gameSales = (existingGameSales != null) ? existingGameSales : new GameSales();
+        gameSales.setGameNo(gameNo);
+        gameSales.setGameName(columns[2]);
+        gameSales.setGameCode(columns[3]);
+        gameSales.setType(Integer.parseInt(columns[4]));
+        gameSales.setCostPrice(new BigDecimal(columns[5]));
+        gameSales.setTax(new BigDecimal(columns[6]));
+        gameSales.setSalePrice(new BigDecimal(columns[7]));
+        gameSales.setDateOfSale(dateOfSale);
+
         batch.add(gameSales);
       } catch (NumberFormatException | DateTimeParseException e) {
         throw new IllegalArgumentException("Invalid data format in CSV: " + e.getMessage(), e);

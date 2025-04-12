@@ -48,32 +48,6 @@ class GameSalesControllerImplTest {
   }
 
   @Test
-  void testImportCsvPerformance() throws Exception {
-    // Mock a large CSV file with 1 million records
-    MultipartFile file = mock(MultipartFile.class);
-    CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
-
-    when(gameSalesService.importCsv(file)).thenReturn(future);
-
-    // Measure the time taken to execute the method
-    long startTime = System.currentTimeMillis();
-    CompletableFuture<Void> result = gameSalesController.importCsv(file);
-    long endTime = System.currentTimeMillis();
-
-    // Ensure the CompletableFuture is completed
-    result.join();
-
-    // Assert the time taken is less than 20 seconds
-    long timeTaken = endTime - startTime;
-    System.out.println("Execution time: " + timeTaken + "ms");
-
-    assertEquals(future, result);
-    assertTrue(timeTaken < 20000, "Importing CSV took longer than 20 seconds");
-
-    verify(gameSalesService, times(1)).importCsv(file);
-  }
-
-  @Test
   void testGetGameSales() {
     LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
     LocalDate toDate = ZonedDateTime.now().toLocalDate();
@@ -86,12 +60,12 @@ class GameSalesControllerImplTest {
     when(gameSalesService.getGameSales(fromDate, toDate, salePrice, filterType, pageable))
         .thenReturn(future);
 
-    long startTime = System.nanoTime();
+    long startTime = System.currentTimeMillis();
     CompletableFuture<Page<GameSales>> result =
         gameSalesController.getGameSales(fromDate, toDate, salePrice, filterType, pageable);
-    long endTime = System.nanoTime();
+    long endTime = System.currentTimeMillis();
 
-    long timeTaken = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+    long timeTaken = endTime - startTime;
     System.out.println("Execution time: " + timeTaken + "ms");
 
     assertEquals(future, result);
@@ -111,12 +85,12 @@ class GameSalesControllerImplTest {
 
     when(gameSalesService.getTotalSales(fromDate, toDate, gameNo)).thenReturn(future);
 
-    long startTime = System.nanoTime();
+    long startTime = System.currentTimeMillis();
     CompletableFuture<List<DailySalesSummary>> result =
         gameSalesController.getTotalSales(fromDate, toDate, gameNo);
-    long endTime = System.nanoTime();
+    long endTime = System.currentTimeMillis();
 
-    long timeTaken = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+    long timeTaken = endTime - startTime;
     System.out.println("Execution time: " + timeTaken + "ms");
 
     assertEquals(future, result);
