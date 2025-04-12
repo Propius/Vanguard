@@ -1,4 +1,4 @@
-package com.agridence.ctts.audit.common.config;
+package com.example.vanguard.common.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -14,19 +14,8 @@ public class SpringOpenAPIDoc {
 
   @Bean
   OpenAPI customOpenAPI() {
-    final String securitySchemeName = "bearerAuth";
-    final String apiTitle = String.format("%s API", StringUtils.capitalize("Audit"));
+    final String apiTitle = String.format("%s API", StringUtils.capitalize("Vanguard"));
     return new OpenAPI()
-        .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
-        .components(
-            new Components()
-                .addSecuritySchemes(
-                    securitySchemeName,
-                    new SecurityScheme()
-                        .name(securitySchemeName)
-                        .type(SecurityScheme.Type.HTTP)
-                        .scheme("bearer")
-                        .bearerFormat("JWT")))
         .info(new Info().title(apiTitle).version("1.0"));
   }
 }

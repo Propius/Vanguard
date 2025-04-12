@@ -1,4 +1,4 @@
-package com.agridence.ctts.audit.common.config;
+package com.example.vanguard.common.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
