@@ -1,7 +1,8 @@
 package com.example.vanguard.service;
 
 import com.example.vanguard.common.enumeration.FilterType;
-import com.example.vanguard.entity.DailySalesSummary;
+import com.example.vanguard.common.enumeration.PeriodFilterType;
+import com.example.vanguard.entity.CombinedSalesSummary;
 import com.example.vanguard.entity.GameSales;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,13 +40,12 @@ public interface GameSalesService {
       Pageable pageable);
 
   /**
-   * Retrieves a paginated list of game sales filtered by date.
+   * Retrieves the total sales summary for a specific period and game number.
    *
-   * @param fromDate the start date for filtering
-   * @param toDate the end date for filtering
-   * @param gameNo the game number for filtering
-   * @return a CompletableFuture containing a page of game sales
+   * @param period the period filter type (e.g., daily, weekly, monthly)
+   * @param gameNo the game number to filter by
+   * @return a CompletableFuture containing a list of daily sales summaries
    */
-  CompletableFuture<List<DailySalesSummary>> getTotalSales(
-      LocalDate fromDate, LocalDate toDate, Integer gameNo);
+  CompletableFuture<List<CombinedSalesSummary>> getTotalSales(
+      PeriodFilterType period, Integer gameNo);
 }

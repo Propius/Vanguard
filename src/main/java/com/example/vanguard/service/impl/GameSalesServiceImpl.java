@@ -2,10 +2,11 @@ package com.example.vanguard.service.impl;
 
 import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
-import com.example.vanguard.entity.DailySalesSummary;
+import com.example.vanguard.common.enumeration.PeriodFilterType;
+import com.example.vanguard.entity.CombinedSalesSummary;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.exception.CsvProcessingException;
-import com.example.vanguard.repository.DailySalesSummaryRepository;
+import com.example.vanguard.repository.CombinedSalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.repository.GameSalesSpecification;
 import com.example.vanguard.service.GameSalesService;
@@ -38,17 +39,17 @@ public class GameSalesServiceImpl implements GameSalesService {
   private static final Logger log = LoggerFactory.getLogger(GameSalesServiceImpl.class);
 
   private final GameSalesRepository gameSalesRepository;
-  private final DailySalesSummaryRepository dailySalesSummaryRepository;
+  private final CombinedSalesSummaryRepository combinedSalesSummaryRepository;
   private final RabbitTemplate rabbitTemplate;
   private final JCacheCacheManager cacheManager;
 
   public GameSalesServiceImpl(
       GameSalesRepository gameSalesRepository,
-      DailySalesSummaryRepository dailySalesSummaryRepository,
+      CombinedSalesSummaryRepository combinedSalesSummaryRepository,
       RabbitTemplate rabbitTemplate,
       JCacheCacheManager cacheManager) {
     this.gameSalesRepository = gameSalesRepository;
-    this.dailySalesSummaryRepository = dailySalesSummaryRepository;
+    this.combinedSalesSummaryRepository = combinedSalesSummaryRepository;
     this.rabbitTemplate = rabbitTemplate;
     this.cacheManager = cacheManager;
   }
@@ -200,26 +201,25 @@ public class GameSalesServiceImpl implements GameSalesService {
   }
 
   /**
-   * Retrieves a paginated list of game sales filtered by date.
+   * Retrieves the total sales summary for a specific period and game number.
    *
-   * @param fromDate the start date for filtering
-   * @param toDate the end date for filtering
-   * @param gameNo the game number for filtering
-   * @return a CompletableFuture containing a page of game sales
+   * @param period the period filter type (e.g., daily, weekly, monthly)
+   * @param gameNo the game number to filter by
+   * @return a CompletableFuture containing a list of daily sales summaries
    */
   @Override
-  public CompletableFuture<List<DailySalesSummary>> getTotalSales(
-      LocalDate fromDate, LocalDate toDate, Integer gameNo) {
+  public CompletableFuture<List<CombinedSalesSummary>> getTotalSales(
+      PeriodFilterType period, Integer gameNo) {
     return CompletableFuture.supplyAsync(
         () -> {
           // Measure start time
           long startTime = System.currentTimeMillis();
 
           Cache cache = cacheManager.getCache("totalSales");
-          String cacheKey = fromDate + "-" + toDate + "-" + gameNo;
+          String cacheKey = period.name() + "-" + gameNo;
 
           // Try to retrieve the cached value
-          List<DailySalesSummary> cachedResult =
+          List<CombinedSalesSummary> cachedResult =
               cache != null ? cache.get(cacheKey, List.class) : null;
           if (cachedResult != null) {
             // Measure end time
@@ -231,8 +231,10 @@ public class GameSalesServiceImpl implements GameSalesService {
             return cachedResult;
           }
 
-          List<DailySalesSummary> dailySalesSummaries =
-              dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo);
+          List<CombinedSalesSummary> dailySalesSummaries =
+              (gameNo == null)
+                  ? combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name())
+                  : combinedSalesSummaryRepository.findByTypeAndGameNo(period.name(), gameNo);
 
           // Store the result in the cache
           if (cache != null) {

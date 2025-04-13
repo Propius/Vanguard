@@ -24,7 +24,7 @@
   ```bash
   mvn spring-boot:run
   ```
-- Remember to run the sql script `daily_sales_summary_view.sql` in your database to create the necessary views.
+- Remember to run the sql script `combined_sales_summary_view.sql` in your database to create the necessary views.
 
 ### Running Test
 

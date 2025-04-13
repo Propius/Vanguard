@@ -1,16 +1,16 @@
 package com.example.vanguard.controller;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.example.vanguard.common.enumeration.FilterType;
+import com.example.vanguard.common.enumeration.PeriodFilterType;
 import com.example.vanguard.controller.impl.GameSalesControllerImpl;
-import com.example.vanguard.entity.DailySalesSummary;
+import com.example.vanguard.entity.CombinedSalesSummary;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.service.GameSalesService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +34,7 @@ class GameSalesControllerImplTest {
   }
 
   @Test
-  void testImportCsv() {
+  void testImportCsv_Success() {
     MultipartFile file = mock(MultipartFile.class);
     CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
 
@@ -47,11 +47,11 @@ class GameSalesControllerImplTest {
   }
 
   @Test
-  void testGetGameSales() {
-    LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
-    LocalDate toDate = ZonedDateTime.now().toLocalDate();
+  void testGetGameSales_Success() {
+    LocalDate fromDate = LocalDate.now().minusDays(1);
+    LocalDate toDate = LocalDate.now();
     BigDecimal salePrice = BigDecimal.valueOf(50);
-    FilterType filterType = FilterType.LESS_THAN; // Replace with an actual enum value
+    FilterType filterType = FilterType.LESS_THAN;
     Pageable pageable = mock(Pageable.class);
     Page<GameSales> page = mock(Page.class);
     CompletableFuture<Page<GameSales>> future = CompletableFuture.completedFuture(page);
@@ -68,20 +68,49 @@ class GameSalesControllerImplTest {
   }
 
   @Test
-  void testGetTotalSales() {
-    LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
-    LocalDate toDate = ZonedDateTime.now().toLocalDate();
-    Integer gameNo = 123;
-    List<DailySalesSummary> summaryList = List.of(mock(DailySalesSummary.class));
-    CompletableFuture<List<DailySalesSummary>> future =
-        CompletableFuture.completedFuture(summaryList);
+  void testGetGameSales_NullParameters() {
+    Pageable pageable = mock(Pageable.class);
+    Page<GameSales> page = mock(Page.class);
+    CompletableFuture<Page<GameSales>> future = CompletableFuture.completedFuture(page);
 
-    when(gameSalesService.getTotalSales(fromDate, toDate, gameNo)).thenReturn(future);
+    when(gameSalesService.getGameSales(null, null, null, null, pageable)).thenReturn(future);
 
-    CompletableFuture<List<DailySalesSummary>> result =
-        gameSalesController.getTotalSales(fromDate, toDate, gameNo);
+    CompletableFuture<Page<GameSales>> result =
+        gameSalesController.getGameSales(null, null, null, null, pageable);
 
     assertEquals(future, result);
-    verify(gameSalesService, times(1)).getTotalSales(fromDate, toDate, gameNo);
+    verify(gameSalesService, times(1)).getGameSales(null, null, null, null, pageable);
+  }
+
+  @Test
+  void testGetTotalSales_Success() {
+    PeriodFilterType period = PeriodFilterType.MONTHLY;
+    Integer gameNo = 123;
+    List<CombinedSalesSummary> summaryList = List.of(mock(CombinedSalesSummary.class));
+    CompletableFuture<List<CombinedSalesSummary>> future =
+        CompletableFuture.completedFuture(summaryList);
+
+    when(gameSalesService.getTotalSales(period, gameNo)).thenReturn(future);
+
+    CompletableFuture<List<CombinedSalesSummary>> result =
+        gameSalesController.getTotalSales(period, gameNo);
+
+    assertEquals(future, result);
+    verify(gameSalesService, times(1)).getTotalSales(period, gameNo);
+  }
+
+  @Test
+  void testGetTotalSales_NullParameters() {
+    List<CombinedSalesSummary> summaryList = List.of(mock(CombinedSalesSummary.class));
+    CompletableFuture<List<CombinedSalesSummary>> future =
+        CompletableFuture.completedFuture(summaryList);
+
+    when(gameSalesService.getTotalSales(null, null)).thenReturn(future);
+
+    CompletableFuture<List<CombinedSalesSummary>> result =
+        gameSalesController.getTotalSales(null, null);
+
+    assertEquals(future, result);
+    verify(gameSalesService, times(1)).getTotalSales(null, null);
   }
 }

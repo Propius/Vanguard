@@ -5,10 +5,11 @@ import static org.mockito.Mockito.*;
 
 import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
-import com.example.vanguard.entity.DailySalesSummary;
+import com.example.vanguard.common.enumeration.PeriodFilterType;
+import com.example.vanguard.entity.CombinedSalesSummary;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.exception.CsvProcessingException;
-import com.example.vanguard.repository.DailySalesSummaryRepository;
+import com.example.vanguard.repository.CombinedSalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.service.impl.GameSalesServiceImpl;
 import java.io.ByteArrayInputStream;
@@ -36,7 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 class GameSalesServiceImplTest {
 
   @Mock private GameSalesRepository gameSalesRepository;
-  @Mock private DailySalesSummaryRepository dailySalesSummaryRepository;
+  @Mock private CombinedSalesSummaryRepository combinedSalesSummaryRepository;
   @Mock private RabbitTemplate rabbitTemplate;
   @Mock private JCacheCacheManager cacheManager;
   @Mock private Cache cache;
@@ -118,35 +119,53 @@ class GameSalesServiceImplTest {
   }
 
   @Test
-  void testGetTotalSales_ValidInputs() {
-    LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
-    LocalDate toDate = ZonedDateTime.now().toLocalDate();
+  void testGetTotalSales_CacheHit() {
+    PeriodFilterType period = PeriodFilterType.DAILY;
     Integer gameNo = 123;
-    List<DailySalesSummary> summaryList = List.of(mock(DailySalesSummary.class));
+    List<CombinedSalesSummary> cachedSummaryList = List.of(mock(CombinedSalesSummary.class));
 
-    when(dailySalesSummaryRepository.findAggregatedSales(fromDate, toDate, gameNo))
-        .thenReturn(summaryList);
+    when(cache.get(period.name() + "-" + gameNo, List.class)).thenReturn(cachedSummaryList);
 
-    CompletableFuture<List<DailySalesSummary>> result =
-        gameSalesService.getTotalSales(fromDate, toDate, gameNo);
+    CompletableFuture<List<CombinedSalesSummary>> result =
+        gameSalesService.getTotalSales(period, gameNo);
 
-    assertEquals(summaryList, result.join());
-    verify(dailySalesSummaryRepository, times(1)).findAggregatedSales(fromDate, toDate, gameNo);
+    assertEquals(cachedSummaryList, result.join());
+    verify(combinedSalesSummaryRepository, never()).findByTypeAndGameNo(anyString(), any());
   }
 
   @Test
-  void testGetTotalSales_CacheHit() {
-    LocalDate fromDate = ZonedDateTime.now().minusDays(1).toLocalDate();
-    LocalDate toDate = ZonedDateTime.now().toLocalDate();
+  void testGetTotalSales_CacheMiss_WithGameNo() {
+    PeriodFilterType period = PeriodFilterType.DAILY;
     Integer gameNo = 123;
-    List<DailySalesSummary> cachedSummaryList = List.of(mock(DailySalesSummary.class));
+    List<CombinedSalesSummary> summaryList = List.of(mock(CombinedSalesSummary.class));
 
-    when(cache.get(anyString(), eq(List.class))).thenReturn(cachedSummaryList);
+    when(cache.get(period.name() + "-" + gameNo, List.class)).thenReturn(null);
+    when(combinedSalesSummaryRepository.findByTypeAndGameNo(period.name(), gameNo))
+        .thenReturn(summaryList);
 
-    CompletableFuture<List<DailySalesSummary>> result =
-        gameSalesService.getTotalSales(fromDate, toDate, gameNo);
+    CompletableFuture<List<CombinedSalesSummary>> result =
+        gameSalesService.getTotalSales(period, gameNo);
 
-    assertEquals(cachedSummaryList, result.join());
-    verify(dailySalesSummaryRepository, never()).findAggregatedSales(any(), any(), any());
+    assertEquals(summaryList, result.join());
+    verify(combinedSalesSummaryRepository, times(1)).findByTypeAndGameNo(period.name(), gameNo);
+    verify(cache, times(1)).put(period.name() + "-" + gameNo, summaryList);
+  }
+
+  @Test
+  void testGetTotalSales_CacheMiss_WithoutGameNo() {
+    PeriodFilterType period = PeriodFilterType.DAILY;
+    Integer gameNo = null;
+    List<CombinedSalesSummary> summaryList = List.of(mock(CombinedSalesSummary.class));
+
+    when(cache.get(period.name() + "-" + gameNo, List.class)).thenReturn(null);
+    when(combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name()))
+        .thenReturn(summaryList);
+
+    CompletableFuture<List<CombinedSalesSummary>> result =
+        gameSalesService.getTotalSales(period, gameNo);
+
+    assertEquals(summaryList, result.join());
+    verify(combinedSalesSummaryRepository, times(1)).findByTypeAndGameNoIsNull(period.name());
+    verify(cache, times(1)).put(period.name() + "-" + gameNo, summaryList);
   }
 }

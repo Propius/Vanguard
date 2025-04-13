@@ -1,21 +1,21 @@
 package com.example.vanguard.entity;
 
+import com.example.vanguard.common.enumeration.PeriodFilterType;
 import jakarta.persistence.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.Subselect;
 
 @Entity
 @Immutable
-@Subselect("SELECT * FROM daily_sales_summary_view")
-@IdClass(DailySalesSummaryId.class)
-public class DailySalesSummary implements Serializable {
+@Subselect("SELECT * FROM combined_sales_summary_view")
+@IdClass(CombinedSalesSummaryId.class)
+public class CombinedSalesSummary implements Serializable {
 
   @Id
-  @Column(name = "date_of_sale", nullable = false)
-  private LocalDate dateOfSale;
+  @Column(name = "period_of_sale", nullable = false)
+  private String periodOfSale;
 
   @Id
   @Column(name = "game_no", nullable = false)
@@ -27,12 +27,15 @@ public class DailySalesSummary implements Serializable {
   @Column(name = "total_sales", nullable = false)
   private BigDecimal totalSales;
 
-  public DailySalesSummary() {
+  @Column(name = "type", nullable = false)
+  private PeriodFilterType type;
+
+  public CombinedSalesSummary() {
     // No-args Constructor
   }
 
-  public LocalDate getDateOfSale() {
-    return dateOfSale;
+  public String getPeriodOfSale() {
+    return periodOfSale;
   }
 
   public Integer getGameNo() {
@@ -45,5 +48,9 @@ public class DailySalesSummary implements Serializable {
 
   public BigDecimal getTotalSales() {
     return totalSales;
+  }
+
+  public PeriodFilterType getType() {
+    return type;
   }
 }
