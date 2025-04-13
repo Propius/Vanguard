@@ -44,10 +44,13 @@ http://localhost:15672/
 ### Screenshots
 
 - /import
+
   ![img.png](img.png)
 
 - /getTotalSales
+
   ![img_1.png](img_1.png)
 
 - /getGameSales
+
   ![img_2.png](img_2.png)
