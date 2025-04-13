@@ -1,6 +1,5 @@
 package com.example.vanguard.entity;
 
-import com.example.vanguard.common.enumeration.PeriodFilterType;
 import jakarta.persistence.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -10,28 +9,34 @@ import org.hibernate.annotations.Subselect;
 @Entity
 @Immutable
 @Subselect("SELECT * FROM combined_sales_summary_view")
-@IdClass(CombinedSalesSummaryId.class)
 public class CombinedSalesSummary implements Serializable {
 
   @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE)
+  @Column(nullable = false)
+  private Long id;
+
   @Column(name = "period_of_sale", nullable = false)
   private String periodOfSale;
 
-  @Id
-  @Column(name = "game_no", nullable = false)
+  @Column(name = "game_no")
   private Integer gameNo;
 
   @Column(name = "total_games_sold", nullable = false)
-  private int totalGamesSold;
+  private Integer totalGamesSold;
 
   @Column(name = "total_sales", nullable = false)
   private BigDecimal totalSales;
 
   @Column(name = "type", nullable = false)
-  private PeriodFilterType type;
+  private String type;
 
   public CombinedSalesSummary() {
     // No-args Constructor
+  }
+
+  public Long getId() {
+    return id;
   }
 
   public String getPeriodOfSale() {
@@ -42,7 +47,7 @@ public class CombinedSalesSummary implements Serializable {
     return gameNo;
   }
 
-  public int getTotalGamesSold() {
+  public Integer getTotalGamesSold() {
     return totalGamesSold;
   }
 
@@ -50,7 +55,7 @@ public class CombinedSalesSummary implements Serializable {
     return totalSales;
   }
 
-  public PeriodFilterType getType() {
+  public String getType() {
     return type;
   }
 }

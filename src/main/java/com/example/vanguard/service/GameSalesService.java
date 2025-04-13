@@ -2,7 +2,7 @@ package com.example.vanguard.service;
 
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
-import com.example.vanguard.entity.CombinedSalesSummary;
+import com.example.vanguard.dto.TotalSalesDto;
 import com.example.vanguard.entity.GameSales;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -46,6 +46,5 @@ public interface GameSalesService {
    * @param gameNo the game number to filter by
    * @return a CompletableFuture containing a list of daily sales summaries
    */
-  CompletableFuture<List<CombinedSalesSummary>> getTotalSales(
-      PeriodFilterType period, Integer gameNo);
+  CompletableFuture<List<TotalSalesDto>> getTotalSales(PeriodFilterType period, Integer gameNo);
 }

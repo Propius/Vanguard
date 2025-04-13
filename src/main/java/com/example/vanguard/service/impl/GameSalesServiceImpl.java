@@ -3,13 +3,14 @@ package com.example.vanguard.service.impl;
 import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
-import com.example.vanguard.entity.CombinedSalesSummary;
+import com.example.vanguard.dto.TotalSalesDto;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.exception.CsvProcessingException;
 import com.example.vanguard.repository.CombinedSalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.repository.GameSalesSpecification;
 import com.example.vanguard.service.GameSalesService;
+import com.example.vanguard.util.TotalSalesMapper;
 import com.example.vanguard.util.ValidationUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -42,16 +43,19 @@ public class GameSalesServiceImpl implements GameSalesService {
   private final CombinedSalesSummaryRepository combinedSalesSummaryRepository;
   private final RabbitTemplate rabbitTemplate;
   private final JCacheCacheManager cacheManager;
+  private final TotalSalesMapper totalSalesMapper;
 
   public GameSalesServiceImpl(
       GameSalesRepository gameSalesRepository,
       CombinedSalesSummaryRepository combinedSalesSummaryRepository,
       RabbitTemplate rabbitTemplate,
-      JCacheCacheManager cacheManager) {
+      JCacheCacheManager cacheManager,
+      TotalSalesMapper totalSalesMapper) {
     this.gameSalesRepository = gameSalesRepository;
     this.combinedSalesSummaryRepository = combinedSalesSummaryRepository;
     this.rabbitTemplate = rabbitTemplate;
     this.cacheManager = cacheManager;
+    this.totalSalesMapper = totalSalesMapper;
   }
 
   /**
@@ -208,7 +212,7 @@ public class GameSalesServiceImpl implements GameSalesService {
    * @return a CompletableFuture containing a list of daily sales summaries
    */
   @Override
-  public CompletableFuture<List<CombinedSalesSummary>> getTotalSales(
+  public CompletableFuture<List<TotalSalesDto>> getTotalSales(
       PeriodFilterType period, Integer gameNo) {
     return CompletableFuture.supplyAsync(
         () -> {
@@ -219,8 +223,7 @@ public class GameSalesServiceImpl implements GameSalesService {
           String cacheKey = period.name() + "-" + gameNo;
 
           // Try to retrieve the cached value
-          List<CombinedSalesSummary> cachedResult =
-              cache != null ? cache.get(cacheKey, List.class) : null;
+          List<TotalSalesDto> cachedResult = cache != null ? cache.get(cacheKey, List.class) : null;
           if (cachedResult != null) {
             // Measure end time
             long endTime = System.currentTimeMillis();
@@ -231,14 +234,20 @@ public class GameSalesServiceImpl implements GameSalesService {
             return cachedResult;
           }
 
-          List<CombinedSalesSummary> dailySalesSummaries =
+          List<TotalSalesDto> totalSales =
               (gameNo == null)
-                  ? combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name())
-                  : combinedSalesSummaryRepository.findByTypeAndGameNo(period.name(), gameNo);
+                  ? combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name()).stream()
+                      .map(totalSalesMapper::mapToTotalSalesDto)
+                      .toList()
+                  : combinedSalesSummaryRepository
+                      .findByTypeAndGameNo(period.name(), gameNo)
+                      .stream()
+                      .map(totalSalesMapper::mapToTotalSalesDto)
+                      .toList();
 
           // Store the result in the cache
           if (cache != null) {
-            cache.put(cacheKey, dailySalesSummaries);
+            cache.put(cacheKey, totalSales);
           }
 
           // Measure end time
@@ -247,7 +256,7 @@ public class GameSalesServiceImpl implements GameSalesService {
           // Print the time taken
           log.info("Time taken to get total sales: {} ms", (endTime - startTime));
 
-          return dailySalesSummaries;
+          return totalSales;
         });
   }
 

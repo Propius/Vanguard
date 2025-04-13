@@ -7,10 +7,10 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"com.example.vanguard"})
 @EnableCaching
 @EnableScheduling
-@EnableAsync
+@EnableAsync(proxyTargetClass = true)
 @EnableSpringDataWebSupport(
     pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class VanguardApplication {
