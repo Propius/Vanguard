@@ -3,7 +3,7 @@ package com.example.vanguard.controller.impl;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
 import com.example.vanguard.controller.GameSalesController;
-import com.example.vanguard.dto.TotalSalesDto;
+import com.example.vanguard.dto.TotalSalesProjection;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.service.GameSalesService;
 import java.math.BigDecimal;
@@ -51,7 +51,7 @@ public class GameSalesControllerImpl implements GameSalesController {
   @Override
   @GetMapping("/getTotalSales")
   @ResponseStatus(HttpStatus.OK)
-  public CompletableFuture<List<TotalSalesDto>> getTotalSales(
+  public CompletableFuture<List<TotalSalesProjection>> getTotalSales(
       @RequestParam PeriodFilterType period, @RequestParam(required = false) Integer gameNo) {
     return gameSalesService.getTotalSales(period, gameNo);
   }

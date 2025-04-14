@@ -3,14 +3,13 @@ package com.example.vanguard.service.impl;
 import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
-import com.example.vanguard.dto.TotalSalesDto;
+import com.example.vanguard.dto.TotalSalesProjection;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.exception.CsvProcessingException;
 import com.example.vanguard.repository.CombinedSalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.repository.GameSalesSpecification;
 import com.example.vanguard.service.GameSalesService;
-import com.example.vanguard.util.TotalSalesMapper;
 import com.example.vanguard.util.ValidationUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -43,19 +42,16 @@ public class GameSalesServiceImpl implements GameSalesService {
   private final CombinedSalesSummaryRepository combinedSalesSummaryRepository;
   private final RabbitTemplate rabbitTemplate;
   private final JCacheCacheManager cacheManager;
-  private final TotalSalesMapper totalSalesMapper;
 
   public GameSalesServiceImpl(
       GameSalesRepository gameSalesRepository,
       CombinedSalesSummaryRepository combinedSalesSummaryRepository,
       RabbitTemplate rabbitTemplate,
-      JCacheCacheManager cacheManager,
-      TotalSalesMapper totalSalesMapper) {
+      JCacheCacheManager cacheManager) {
     this.gameSalesRepository = gameSalesRepository;
     this.combinedSalesSummaryRepository = combinedSalesSummaryRepository;
     this.rabbitTemplate = rabbitTemplate;
     this.cacheManager = cacheManager;
-    this.totalSalesMapper = totalSalesMapper;
   }
 
   /**
@@ -209,10 +205,10 @@ public class GameSalesServiceImpl implements GameSalesService {
    *
    * @param period the period filter type (e.g., daily, weekly, monthly)
    * @param gameNo the game number to filter by
-   * @return a CompletableFuture containing a list of daily sales summaries
+   * @return a CompletableFuture containing a list of total sales projections
    */
   @Override
-  public CompletableFuture<List<TotalSalesDto>> getTotalSales(
+  public CompletableFuture<List<TotalSalesProjection>> getTotalSales(
       PeriodFilterType period, Integer gameNo) {
     return CompletableFuture.supplyAsync(
         () -> {
@@ -223,7 +219,8 @@ public class GameSalesServiceImpl implements GameSalesService {
           String cacheKey = period.name() + "-" + gameNo;
 
           // Try to retrieve the cached value
-          List<TotalSalesDto> cachedResult = cache != null ? cache.get(cacheKey, List.class) : null;
+          List<TotalSalesProjection> cachedResult =
+              cache != null ? cache.get(cacheKey, List.class) : null;
           if (cachedResult != null) {
             // Measure end time
             long endTime = System.currentTimeMillis();
@@ -234,16 +231,10 @@ public class GameSalesServiceImpl implements GameSalesService {
             return cachedResult;
           }
 
-          List<TotalSalesDto> totalSales =
+          List<TotalSalesProjection> totalSales =
               (gameNo == null)
-                  ? combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name()).stream()
-                      .map(totalSalesMapper::mapToTotalSalesDto)
-                      .toList()
-                  : combinedSalesSummaryRepository
-                      .findByTypeAndGameNo(period.name(), gameNo)
-                      .stream()
-                      .map(totalSalesMapper::mapToTotalSalesDto)
-                      .toList();
+                  ? combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name())
+                  : combinedSalesSummaryRepository.findByTypeAndGameNo(period.name(), gameNo);
 
           // Store the result in the cache
           if (cache != null) {

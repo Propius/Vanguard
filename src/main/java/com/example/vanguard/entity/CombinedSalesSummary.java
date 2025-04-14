@@ -12,7 +12,6 @@ import org.hibernate.annotations.Subselect;
 public class CombinedSalesSummary implements Serializable {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.SEQUENCE)
   @Column(nullable = false)
   private Long id;
 

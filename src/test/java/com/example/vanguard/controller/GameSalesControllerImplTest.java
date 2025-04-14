@@ -6,7 +6,7 @@ import static org.mockito.Mockito.*;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
 import com.example.vanguard.controller.impl.GameSalesControllerImpl;
-import com.example.vanguard.dto.TotalSalesDto;
+import com.example.vanguard.dto.TotalSalesProjection;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.service.GameSalesService;
 import java.math.BigDecimal;
@@ -86,12 +86,13 @@ class GameSalesControllerImplTest {
   void testGetTotalSales_Success() {
     PeriodFilterType period = PeriodFilterType.MONTHLY;
     Integer gameNo = 123;
-    List<TotalSalesDto> summaryList = List.of(mock(TotalSalesDto.class));
-    CompletableFuture<List<TotalSalesDto>> future = CompletableFuture.completedFuture(summaryList);
+    List<TotalSalesProjection> summaryList = List.of(mock(TotalSalesProjection.class));
+    CompletableFuture<List<TotalSalesProjection>> future =
+        CompletableFuture.completedFuture(summaryList);
 
     when(gameSalesService.getTotalSales(period, gameNo)).thenReturn(future);
 
-    CompletableFuture<List<TotalSalesDto>> result =
+    CompletableFuture<List<TotalSalesProjection>> result =
         gameSalesController.getTotalSales(period, gameNo);
 
     assertEquals(future, result);
@@ -100,12 +101,14 @@ class GameSalesControllerImplTest {
 
   @Test
   void testGetTotalSales_NullParameters() {
-    List<TotalSalesDto> summaryList = List.of(mock(TotalSalesDto.class));
-    CompletableFuture<List<TotalSalesDto>> future = CompletableFuture.completedFuture(summaryList);
+    List<TotalSalesProjection> summaryList = List.of(mock(TotalSalesProjection.class));
+    CompletableFuture<List<TotalSalesProjection>> future =
+        CompletableFuture.completedFuture(summaryList);
 
     when(gameSalesService.getTotalSales(null, null)).thenReturn(future);
 
-    CompletableFuture<List<TotalSalesDto>> result = gameSalesController.getTotalSales(null, null);
+    CompletableFuture<List<TotalSalesProjection>> result =
+        gameSalesController.getTotalSales(null, null);
 
     assertEquals(future, result);
     verify(gameSalesService, times(1)).getTotalSales(null, null);

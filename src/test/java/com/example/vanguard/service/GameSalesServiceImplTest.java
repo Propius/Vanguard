@@ -6,14 +6,13 @@ import static org.mockito.Mockito.*;
 import com.example.vanguard.common.config.RabbitMQConfig;
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
-import com.example.vanguard.dto.TotalSalesDto;
+import com.example.vanguard.dto.TotalSalesProjection;
 import com.example.vanguard.entity.CombinedSalesSummary;
 import com.example.vanguard.entity.GameSales;
 import com.example.vanguard.exception.CsvProcessingException;
 import com.example.vanguard.repository.CombinedSalesSummaryRepository;
 import com.example.vanguard.repository.GameSalesRepository;
 import com.example.vanguard.service.impl.GameSalesServiceImpl;
-import com.example.vanguard.util.TotalSalesMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.Spy;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.cache.Cache;
 import org.springframework.cache.jcache.JCacheCacheManager;
@@ -43,7 +41,6 @@ class GameSalesServiceImplTest {
   @Mock private CombinedSalesSummaryRepository combinedSalesSummaryRepository;
   @Mock private RabbitTemplate rabbitTemplate;
   @Mock private JCacheCacheManager cacheManager;
-  @Spy private TotalSalesMapper totalSalesMapper;
   @Mock private Cache cache;
 
   @InjectMocks private GameSalesServiceImpl gameSalesService;
@@ -130,7 +127,8 @@ class GameSalesServiceImplTest {
 
     when(cache.get(period.name() + "-" + gameNo, List.class)).thenReturn(cachedSummaryList);
 
-    CompletableFuture<List<TotalSalesDto>> result = gameSalesService.getTotalSales(period, gameNo);
+    CompletableFuture<List<TotalSalesProjection>> result =
+        gameSalesService.getTotalSales(period, gameNo);
 
     assertEquals(cachedSummaryList, result.join());
     verify(combinedSalesSummaryRepository, never()).findByTypeAndGameNo(any(), any());
@@ -141,15 +139,14 @@ class GameSalesServiceImplTest {
     PeriodFilterType period = PeriodFilterType.DAILY;
     Integer gameNo = 123;
     List<CombinedSalesSummary> summaryList = List.of(mock(CombinedSalesSummary.class));
-    List<TotalSalesDto> mappedList = List.of(mock(TotalSalesDto.class));
+    List<TotalSalesProjection> mappedList = List.of(mock(TotalSalesProjection.class));
 
     when(cache.get(period.name() + "-" + gameNo, List.class)).thenReturn(null);
     when(combinedSalesSummaryRepository.findByTypeAndGameNo(period.name(), gameNo))
-        .thenReturn(summaryList);
-    when(totalSalesMapper.mapToTotalSalesDto(any(CombinedSalesSummary.class)))
-        .thenReturn(mappedList.getFirst()); // Assuming mappedList has at least one element
+        .thenReturn(mappedList);
 
-    CompletableFuture<List<TotalSalesDto>> result = gameSalesService.getTotalSales(period, gameNo);
+    CompletableFuture<List<TotalSalesProjection>> result =
+        gameSalesService.getTotalSales(period, gameNo);
 
     assertEquals(mappedList, result.join());
     verify(combinedSalesSummaryRepository, times(1)).findByTypeAndGameNo(period.name(), gameNo);
@@ -161,15 +158,14 @@ class GameSalesServiceImplTest {
     PeriodFilterType period = PeriodFilterType.DAILY;
     Integer gameNo = null;
     List<CombinedSalesSummary> summaryList = List.of(mock(CombinedSalesSummary.class));
-    List<TotalSalesDto> mappedList = List.of(mock(TotalSalesDto.class));
+    List<TotalSalesProjection> mappedList = List.of(mock(TotalSalesProjection.class));
 
     when(cache.get(period.name() + "-" + gameNo, List.class)).thenReturn(null);
     when(combinedSalesSummaryRepository.findByTypeAndGameNoIsNull(period.name()))
-        .thenReturn(summaryList);
-    when(totalSalesMapper.mapToTotalSalesDto(any(CombinedSalesSummary.class)))
-        .thenReturn(mappedList.getFirst()); // Assuming mappedList has at least one element
+        .thenReturn(mappedList);
 
-    CompletableFuture<List<TotalSalesDto>> result = gameSalesService.getTotalSales(period, gameNo);
+    CompletableFuture<List<TotalSalesProjection>> result =
+        gameSalesService.getTotalSales(period, gameNo);
 
     assertEquals(mappedList, result.join());
     verify(combinedSalesSummaryRepository, times(1)).findByTypeAndGameNoIsNull(period.name());

@@ -2,7 +2,7 @@ package com.example.vanguard.controller;
 
 import com.example.vanguard.common.enumeration.FilterType;
 import com.example.vanguard.common.enumeration.PeriodFilterType;
-import com.example.vanguard.dto.TotalSalesDto;
+import com.example.vanguard.dto.TotalSalesProjection;
 import com.example.vanguard.entity.GameSales;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -69,7 +69,7 @@ public interface GameSalesController {
             description = "Internal Server Error",
             content = @Content)
       })
-  CompletableFuture<List<TotalSalesDto>> getTotalSales(
+  CompletableFuture<List<TotalSalesProjection>> getTotalSales(
       @RequestParam
           @Schema(
               implementation = PeriodFilterType.class,
